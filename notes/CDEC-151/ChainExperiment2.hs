@@ -1,14 +1,14 @@
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 module ChainExperiment2 where
 
-import Data.Word
+-- import Data.Word
 import Data.List (foldl', intersect, tails)
 import Data.Hashable
 import qualified Data.Map as Map
 import           Data.Map (Map)
 import           Data.Maybe (fromMaybe)
 
-import Control.Applicative
+-- import Control.Applicative
 
 import Test.QuickCheck
 
@@ -356,7 +356,7 @@ addBlockVolatile b' (Volatile blocks (Just tip))
   where
     tip'    = blockId b'
     blocks' = Map.insert tip' (b', Nothing)
-            . Map.adjust (\(b, Nothing) -> (b, Just tip')) tip
+            . Map.adjust (\(b, _) -> (b, Just tip')) tip
             $ blocks
 
 -- | For building a chain from empty using the 'addBlock', at each step
@@ -605,7 +605,7 @@ normalizeChainProducerState
             }
 
 applyChainProducerUpdate :: ChainUpdate -> ChainProducerState -> ChainProducerState
-applyChainProducerUpdate cu (cps@ChainProducerState {chainState, chainReaders})
+applyChainProducerUpdate cu (cps@ChainProducerState {chainState})
     = (normalizeChainProducerState cu cps) { chainState = applyChainStateUpdate cu chainState }
 
 invApplyChainProducerUpdate :: ChainUpdate -> ChainProducerState ->  Bool
