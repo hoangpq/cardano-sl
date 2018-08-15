@@ -76,6 +76,7 @@ createWallet wallet
         , walCreatedAt                  = V1 createdAt
         , walAssuranceLevel             = v1AssuranceLevel
         , walSyncState                  = V1.Synced
+        , walType                       = V1.WalletRegular
         }
       where
         (hasSpendingPassword, mbLastUpdate) =
