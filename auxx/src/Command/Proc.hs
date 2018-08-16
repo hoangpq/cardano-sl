@@ -20,17 +20,18 @@ import           Pos.Chain.Txp (TxpConfiguration)
 import           Pos.Chain.Update (BlockVersionModifier (..))
 import           Pos.Client.KeyStorage (addSecretKey, getSecretKeysPlain)
 import           Pos.Client.Txp.Balances (getBalance)
-import           Pos.Core (AddrStakeDistribution (..), Address, StakeholderId,
-                     addressHash, mkMultiKeyDistr, unsafeGetCoin)
+import           Pos.Core as Core (AddrStakeDistribution (..), Address,
+                     Config (..), StakeholderId, addressHash, mkMultiKeyDistr,
+                     unsafeGetCoin)
 import           Pos.Core.Common (AddrAttributes (..), AddrSpendingData (..),
                      makeAddress)
-import           Pos.Core.Configuration (genesisSecretKeys)
 import           Pos.Core.Delegation (HeavyDlgIndex (..))
+import           Pos.Core.Genesis (gsSecretKeys)
 import           Pos.Core.Txp (TxOut (..))
 import           Pos.Core.Update (SoftwareVersion (..))
-import           Pos.Crypto (ProtocolMagic, PublicKey, emptyPassphrase,
-                     encToPublic, fullPublicKeyF, hashHexF, noPassEncrypt,
-                     safeCreatePsk, unsafeCheatingHashCoerce, withSafeSigner)
+import           Pos.Crypto (PublicKey, SecretKey, emptyPassphrase, encToPublic,
+                     fullPublicKeyF, hashHexF, noPassEncrypt, safeCreatePsk,
+                     unsafeCheatingHashCoerce, withSafeSigner)
 import           Pos.DB.Class (MonadGState (..))
 import           Pos.Infra.Diffusion.Types (Diffusion (..))
 import           Pos.Util.UserSecret (WalletUserSecret (..), readUserSecret,
@@ -63,13 +64,13 @@ import           Repl (PrintAction)
 
 createCommandProcs ::
        forall m. (MonadIO m, CanLog m, HasLoggerName m)
-    => Maybe ProtocolMagic
+    => Maybe Core.Config
     -> Maybe TxpConfiguration
     -> Maybe (Dict (MonadAuxxMode m))
     -> PrintAction m
     -> Maybe (Diffusion m)
     -> [CommandProc m]
-createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . fix $ \commands -> [
+createCommandProcs mCoreConfig mTxpConfig hasAuxxMode printAction mDiffusion = rights . fix $ \commands -> [
 
     return CommandProc
     { cpName = "L"
@@ -211,7 +212,7 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
     },
 
     let name = "send-to-all-genesis" in
-    needsProtocolMagic name >>= \pm ->
+    needsCoreConfig name >>= \coreConfig ->
     needsDiffusion name >>= \diffusion ->
     needsAuxxMode name >>= \Dict ->
     return CommandProc
@@ -225,7 +226,11 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
         stagpTpsSentFile <- getArg tyFilePath "file"
         return Tx.SendToAllGenesisParams{..}
     , cpExec = \stagp -> do
-        Tx.sendToAllGenesis pm diffusion stagp
+        let secretKeys = getSecretKeys coreConfig
+        Tx.sendToAllGenesis (configProtocolMagic coreConfig)
+                            secretKeys
+                            diffusion
+                            stagp
         return ValueUnit
     , cpHelp = "create and send transactions from all genesis addresses \
                \ for <duration> seconds, <delay> in ms. <conc> is the \
@@ -246,7 +251,7 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
     },
 
     let name = "send" in
-    needsProtocolMagic name >>= \pm ->
+    needsCoreConfig name >>= \coreConfig ->
     needsDiffusion name >>= \diffusion ->
     needsAuxxMode name >>= \Dict ->
     return CommandProc
@@ -256,14 +261,14 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
         (,) <$> getArg tyInt "i"
             <*> getArgSome tyTxOut "out"
     , cpExec = \(i, outputs) -> do
-        Tx.send pm diffusion i outputs
+        Tx.send (configProtocolMagic coreConfig) diffusion i outputs
         return ValueUnit
     , cpHelp = "send from #i to specified transaction outputs \
                \ (use 'tx-out' to build them)"
     },
 
     let name = "vote" in
-    needsProtocolMagic name >>= \pm ->
+    needsCoreConfig name >>= \coreConfig ->
     needsDiffusion name >>= \diffusion ->
     needsAuxxMode name >>= \Dict ->
     return CommandProc
@@ -274,7 +279,7 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
              <*> getArg tyBool "agree"
              <*> getArg tyHash "up-id"
     , cpExec = \(i, decision, upId) -> do
-        Update.vote pm diffusion i decision upId
+        Update.vote (configProtocolMagic coreConfig) diffusion i decision upId
         return ValueUnit
     , cpHelp = "send vote for update proposal <up-id> and \
                \ decision <agree> ('true' or 'false'), \
@@ -330,7 +335,7 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
     },
 
     let name = "propose-update" in
-    needsProtocolMagic name >>= \pm ->
+    needsCoreConfig name >>= \coreConfig ->
     needsDiffusion name >>= \diffusion ->
     needsAuxxMode name >>= \Dict ->
     return CommandProc
@@ -352,7 +357,8 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
         -- FIXME: confuses existential/universal. A better solution
         -- is to have two ValueHash constructors, one with universal and
         -- one with existential (relevant via singleton-style GADT) quantification.
-        ValueHash . unsafeCheatingHashCoerce <$> Update.propose pm diffusion params
+        ValueHash . unsafeCheatingHashCoerce
+            <$> Update.propose (configProtocolMagic coreConfig) diffusion params
     , cpHelp = "propose an update with one positive vote for it \
                \ using secret key #i"
     },
@@ -368,7 +374,7 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
     },
 
     let name = "delegate-heavy" in
-    needsProtocolMagic name >>= \pm ->
+    needsCoreConfig name >>= \coreConfig ->
     needsDiffusion name >>= \diffusion ->
     needsAuxxMode name >>= \Dict ->
     return CommandProc
@@ -384,7 +390,10 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
         withSafeSigner issuerSk (pure emptyPassphrase) $ \case
             Nothing -> logError "Invalid passphrase"
             Just ss -> do
-                let psk = safeCreatePsk pm ss delegatePk (HeavyDlgIndex curEpoch)
+                let psk = safeCreatePsk (configProtocolMagic coreConfig)
+                                        ss
+                                        delegatePk
+                                        (HeavyDlgIndex curEpoch)
                 if dry
                 then do
                     printAction $
@@ -402,7 +411,7 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
     },
 
     let name = "generate-blocks" in
-    needsProtocolMagic name >>= \pm ->
+    needsCoreConfig name >>= \coreConfig ->
     needsAuxxMode name >>= \Dict ->
     needsTxpConfig name >>= \txpConfig ->
     return CommandProc
@@ -413,12 +422,13 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
         bgoSeed <- getArgOpt tyInt "seed"
         return GenBlocksParams{..}
     , cpExec = \params -> do
-        generateBlocks pm txpConfig params
+        generateBlocks (configProtocolMagic coreConfig) txpConfig params
         return ValueUnit
     , cpHelp = "generate <n> blocks"
     },
 
     let name = "add-key-pool" in
+    needsCoreConfig name >>= \config ->
     needsAuxxMode name >>= \Dict ->
     return CommandProc
     { cpName = name
@@ -426,9 +436,9 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
     , cpArgumentConsumer = getArgMany tyInt "i"
     , cpExec = \is -> do
         when (null is) $ logWarning "Not adding keys from pool (list is empty)"
-        let secrets = fromMaybe (error "Secret keys are unknown") genesisSecretKeys
+        let secretKeys = getSecretKeys config
         forM_ is $ \i -> do
-            key <- evaluateNF $ secrets !! i
+            key <- evaluateNF $ secretKeys !! i
             addSecretKey $ noPassEncrypt key
         return ValueUnit
     , cpHelp = ""
@@ -457,7 +467,7 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
     },
 
     let name = "rollback" in
-    needsProtocolMagic name >>= \pm ->
+    needsCoreConfig name >>= \coreConfig ->
     needsAuxxMode name >>= \Dict ->
     return CommandProc
     { cpName = name
@@ -467,7 +477,9 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
         rpDumpPath <- getArg tyFilePath "dump-file"
         pure RollbackParams{..}
     , cpExec = \RollbackParams{..} -> do
-        Rollback.rollbackAndDump pm rpNum rpDumpPath
+        Rollback.rollbackAndDump (configProtocolMagic coreConfig)
+                                 rpNum
+                                 rpDumpPath
         return ValueUnit
     , cpHelp = ""
     },
@@ -512,18 +524,19 @@ createCommandProcs mpm mTxpConfig hasAuxxMode printAction mDiffusion = rights . 
     , cpHelp = "display this message"
     }]
   where
-    needsAuxxMode :: Name -> Either UnavailableCommand (Dict (MonadAuxxMode m))
-    needsAuxxMode name =
-        maybe (Left $ UnavailableCommand name "AuxxMode is not available") Right hasAuxxMode
-    needsDiffusion :: Name -> Either UnavailableCommand (Diffusion m)
-    needsDiffusion name =
-        maybe (Left $ UnavailableCommand name "Diffusion layer is not available") Right mDiffusion
-    needsProtocolMagic :: Name -> Either UnavailableCommand ProtocolMagic
-    needsProtocolMagic name =
-        maybe (Left $ UnavailableCommand name "ProtocolMagic is not available") Right mpm
-    needsTxpConfig :: Name -> Either UnavailableCommand TxpConfiguration
-    needsTxpConfig name =
-        maybe (Left $ UnavailableCommand name "TxpConfiguration is not available") Right mTxpConfig
+    needsData :: Maybe a -> Text -> Name -> Either UnavailableCommand a
+    needsData mData msg name = maybe
+        (Left $ UnavailableCommand name (msg <> " is not available"))
+        Right
+        mData
+    needsAuxxMode = needsData hasAuxxMode "AuxxMode"
+    needsDiffusion = needsData mDiffusion "Diffusion layer"
+    needsCoreConfig = needsData mCoreConfig "Core.Config"
+    needsTxpConfig = needsData mTxpConfig "TxpConfiguration"
+    getSecretKeys :: Core.Config -> [SecretKey]
+    getSecretKeys coreConfig = gsSecretKeys $ fromMaybe
+        (error "Proc.createCommandProcs: GeneratedSecrets missing from config")
+        (configGeneratedSecrets coreConfig)
 
 procConst :: Applicative m => Name -> Value -> CommandProc m
 procConst name value =

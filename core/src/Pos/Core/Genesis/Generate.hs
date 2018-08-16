@@ -3,6 +3,9 @@
 module Pos.Core.Genesis.Generate
        ( GeneratedGenesisData (..)
        , GeneratedSecrets (..)
+       , gsSecretKeys
+       , gsSecretKeysRich
+       , gsSecretKeysPoor
        , PoorSecret (..)
        , RichSecrets (..)
 
@@ -95,6 +98,15 @@ data GeneratedSecrets = GeneratedSecrets
     , gsFakeAvvmSeeds     :: ![ByteString]
     -- ^ Fake avvm seeds.
     }
+
+gsSecretKeys :: GeneratedSecrets -> [SecretKey]
+gsSecretKeys gs = gsSecretKeysRich gs <> gsSecretKeysPoor gs
+
+gsSecretKeysRich :: GeneratedSecrets -> [SecretKey]
+gsSecretKeysRich = map rsPrimaryKey . gsRichSecrets
+
+gsSecretKeysPoor :: GeneratedSecrets -> [SecretKey]
+gsSecretKeysPoor = map poorSecretToKey . gsPoorSecrets
 
 generateGenesisData
     :: HasProtocolConstants

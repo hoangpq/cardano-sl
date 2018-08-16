@@ -26,8 +26,7 @@ import           Pos.Chain.Block (mainBlockTxPayload)
 import qualified Pos.Chain.Lrc as Lrc
 import           Pos.Chain.Txp (TxpConfiguration (..))
 import           Pos.Core (Coin, EpochIndex, StakeholderId, addressHash,
-                     blkSecurityParam, coinF, epochSlots, genesisData,
-                     genesisSecretKeysPoor, genesisSecretKeysRich)
+                     blkSecurityParam, coinF, epochSlots, genesisData)
 import           Pos.Core.Genesis (GenesisData (..), GenesisInitializer (..),
                      TestnetBalanceOptions (..))
 import           Pos.Core.Txp (TxAux, mkTxPayload)
@@ -48,6 +47,8 @@ import           Test.Pos.Block.Logic.Util (EnableTxPayload (..),
 import           Test.Pos.Block.Property (blockPropertySpec)
 import           Test.Pos.Configuration (defaultTestBlockVersionData,
                      withStaticConfigurations)
+import           Test.Pos.Core.Dummy (dummyGenesisSecretKeysPoor,
+                     dummyGenesisSecretKeysRich)
 import           Test.Pos.Crypto.Dummy (dummyProtocolMagic)
 import           Test.Pos.Util.QuickCheck (maybeStopProperty, stopProperty)
 
@@ -184,13 +185,12 @@ checkRichmen = do
     checkRichmenFull =<< getRichmen (lift . LrcDB.tryGetUSRichmen)
     checkRichmenSet =<< getRichmen (lift . LrcDB.tryGetDlgRichmen)
   where
-    toStakeholders :: Maybe [SecretKey] -> [StakeholderId]
-    toStakeholders = map (addressHash . toPublic) . fromMaybe
-        (error "genesis secrets are unknown in tests")
+    toStakeholders :: [SecretKey] -> [StakeholderId]
+    toStakeholders = map (addressHash . toPublic)
     poorStakeholders :: [StakeholderId]
-    poorStakeholders = toStakeholders genesisSecretKeysPoor
+    poorStakeholders = toStakeholders dummyGenesisSecretKeysPoor
     richStakeholders :: [StakeholderId]
-    richStakeholders = toStakeholders genesisSecretKeysRich
+    richStakeholders = toStakeholders dummyGenesisSecretKeysRich
 
     getRichmen ::
            (EpochIndex -> BlockProperty (Maybe richmen))

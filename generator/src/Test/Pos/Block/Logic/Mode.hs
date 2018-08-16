@@ -63,9 +63,9 @@ import           Pos.Chain.Block (HasSlogGState (..))
 import           Pos.Chain.Delegation (DelegationVar, HasDlgConfiguration)
 import           Pos.Chain.Ssc (SscMemTag, SscState)
 import           Pos.Chain.Txp (TxpConfiguration (..))
-import           Pos.Core (CoreConfiguration (..), GenesisConfiguration (..),
-                     HasConfiguration, HasProtocolConstants, SlotId,
-                     Timestamp (..), epochSlots, genesisSecretKeys,
+import           Pos.Core as Core (Config, CoreConfiguration (..),
+                     GenesisConfiguration (..), HasConfiguration,
+                     HasProtocolConstants, SlotId, Timestamp (..), epochSlots,
                      withGenesisSpec)
 import           Pos.Core.Conc (currentTime)
 import           Pos.Core.Configuration (HasGenesisBlockVersionData,
@@ -75,7 +75,6 @@ import           Pos.Core.Reporting (HasMisbehaviorMetrics (..),
                      MonadReporting (..))
 import           Pos.Core.Slotting (MonadSlotsData)
 import           Pos.Core.Update (BlockVersionData)
-import           Pos.Crypto (ProtocolMagic)
 import           Pos.DB (DBPure, MonadDB (..), MonadDBRead (..),
                      MonadGState (..))
 import qualified Pos.DB as DB
@@ -119,6 +118,7 @@ import           Test.Pos.Block.Logic.Emulation (Emulation (..), runEmulation,
 import           Test.Pos.Configuration (defaultTestBlockVersionData,
                      defaultTestConf, defaultTestGenesisSpec)
 import           Test.Pos.Core.Arbitrary ()
+import           Test.Pos.Core.Dummy (dummyGenesisSecretKeys)
 import           Test.Pos.Crypto.Dummy (dummyProtocolMagic)
 
 ----------------------------------------------------------------------------
@@ -174,7 +174,7 @@ genGenesisInitializer = do
 
 -- This function creates 'CoreConfiguration' from 'TestParams' and
 -- uses it to satisfy 'HasConfiguration'.
-withTestParams :: TestParams -> (HasConfiguration => ProtocolMagic -> r) -> r
+withTestParams :: TestParams -> (HasConfiguration => Core.Config -> r) -> r
 withTestParams TestParams {..} = withGenesisSpec _tpStartTime coreConfiguration id
   where
     defaultCoreConf :: CoreConfiguration
@@ -286,12 +286,7 @@ initBlockTestContext tp@TestParams {..} callback = do
             let btcGState = GS.GStateContext {_gscDB = DB.PureDB dbPureVar, ..}
             btcDelegation <- mkDelegationVar
             btcPureDBSnapshots <- PureDBSnapshotsVar <$> newIORef Map.empty
-            let secretKeys =
-                    case genesisSecretKeys of
-                        Nothing ->
-                            error "initBlockTestContext: no genesisSecretKeys"
-                        Just ks -> ks
-            let btcAllSecrets = mkAllSecretsSimple secretKeys
+            let btcAllSecrets = mkAllSecretsSimple dummyGenesisSecretKeys
             let btCtx = BlockTestContext {btcSystemStart = systemStart, btcSSlottingStateVar = slottingState, ..}
             liftIO $ flip runReaderT clockVar $ unEmulation $ callback btCtx
     sudoLiftIO $ runTestInitMode initCtx $ initBlockTestContextDo
