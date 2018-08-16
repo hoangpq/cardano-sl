@@ -549,7 +549,7 @@ readerInstructions (ChainProducerState (ChainState (Volatile blocks _)) crs) rid
         then Just ccs
         else do
             bs <- chainBackwardsFromTo blocks (snd readerHead) (snd readerIntersection)
-            Just $ (fmap (RollBackward . blockPoint) bs) ++ ccs
+            Just $ map (RollBackward . blockPoint) bs ++ ccs
 
 -- |
 -- Rollback pointers if we are switching to another tine (which will remove
@@ -600,7 +600,7 @@ normalizeChainProducerState
     updateReaderState p b ReaderState {readerIntersection, readerHead, readerId}
         = ReaderState
             { readerIntersection = updatePointer b p readerIntersection
-            , readerHead = updatePointer b p readerHead
+            , readerHead         = updatePointer b p readerHead
             , readerId
             }
 
