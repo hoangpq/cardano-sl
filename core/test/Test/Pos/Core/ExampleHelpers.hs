@@ -15,9 +15,17 @@ module Test.Pos.Core.ExampleHelpers
         , exampleCommitmentSignature
         , exampleChainDifficulty
         , exampleEpochIndex
-        , exampleGenesisAvvmBalances
-        , exampleGenesisConfiguration_GCSpec
+        , exampleGenesisWStakeholders
+        , exampleGenesisVssCertificatesMap
+        , exampleGenesisNonAvvmBalances
+        , exampleGenesisAvvmBalances0
+        , exampleGenesisAvvmBalances1
+        , exampleGenesisAvvmBalances2
+        , exampleGenesisConfiguration_GCSpec0
+        , exampleGenesisConfiguration_GCSpec1
+        , exampleGenesisConfiguration_GCSpec2
         , exampleGenesisConfiguration_GCSrc
+        , exampleGenesisData
         , exampleGenesisDelegation
         , exampleGenesisInitializer
         , exampleHashTx
@@ -25,7 +33,9 @@ module Test.Pos.Core.ExampleHelpers
         , exampleLightDlgIndices
         , exampleOpening
         , exampleOpeningsMap
-        , exampleGenesisProtocolConstants
+        , exampleGenesisProtocolConstants0
+        , exampleGenesisProtocolConstants1
+        , exampleGenesisProtocolConstants2
         , exampleProxySKBlockInfo
         , examplePublicKey
         , exampleRedeemPublicKey
@@ -33,7 +43,9 @@ module Test.Pos.Core.ExampleHelpers
         , exampleScript
         , exampleSecretKey
         , exampleSecretKeys
-        , exampleSharedSeed
+        , exampleSharedSeed0
+        , exampleSharedSeed1
+        , exampleSharedSeed2
         , exampleSharesDistribution
         , exampleSignedCommitment
         , exampleSlotId
@@ -111,14 +123,17 @@ import           Pos.Core.Configuration
 import           Pos.Core.Delegation (HeavyDlgIndex (..), LightDlgIndices (..),
                      ProxySKBlockInfo, ProxySKHeavy)
 import           Pos.Core.Genesis (FakeAvvmOptions (..),
-                     GenesisAvvmBalances (..), GenesisDelegation (..),
-                     GenesisInitializer (..), GenesisProtocolConstants (..),
-                     GenesisSpec (..), TestnetBalanceOptions (..))
+                     GenesisAvvmBalances (..), GenesisData (..),
+                     GenesisDelegation (..), GenesisInitializer (..),
+                     GenesisNonAvvmBalances (..),
+                     GenesisProtocolConstants (..), GenesisSpec (..),
+                     GenesisVssCertificatesMap (..), GenesisWStakeholders (..),
+                     TestnetBalanceOptions (..))
 import           Pos.Core.Merkle (mkMerkleTree, mtRoot)
 import           Pos.Core.ProtocolConstants (ProtocolConstants, VssMaxTTL (..),
                      VssMinTTL (..))
 import           Pos.Core.Slotting (EpochIndex (..), FlatSlotId,
-                     LocalSlotIndex (..), SlotId (..))
+                     LocalSlotIndex (..), SlotId (..), Timestamp (..))
 import           Pos.Core.Ssc (Commitment, CommitmentSignature, CommitmentsMap,
                      InnerSharesMap, Opening, OpeningsMap, SharesDistribution,
                      SignedCommitment, SscPayload (..), SscProof (..),
@@ -618,18 +633,76 @@ exampleGenesisConfiguration_GCSrc :: GenesisConfiguration
 exampleGenesisConfiguration_GCSrc =
     GCSrc "dRaMwdYsH3QA3dChe" (abstractHash (Raw "Test"))
 
-exampleGenesisConfiguration_GCSpec :: GenesisConfiguration
-exampleGenesisConfiguration_GCSpec =
+exampleGenesisConfiguration_GCSpec0 :: GenesisConfiguration
+exampleGenesisConfiguration_GCSpec0 =
     GCSpec $ UnsafeGenesisSpec
-        exampleGenesisAvvmBalances
-        exampleSharedSeed
+        exampleGenesisAvvmBalances0
+        exampleSharedSeed0
         exampleGenesisDelegation
         exampleBlockVersionData
-        exampleGenesisProtocolConstants
+        exampleGenesisProtocolConstants0
         exampleGenesisInitializer
 
-exampleGenesisAvvmBalances :: GenesisAvvmBalances
-exampleGenesisAvvmBalances =
+exampleGenesisConfiguration_GCSpec1 :: GenesisConfiguration
+exampleGenesisConfiguration_GCSpec1 =
+    GCSpec $ UnsafeGenesisSpec
+        exampleGenesisAvvmBalances1
+        exampleSharedSeed1
+        exampleGenesisDelegation
+        exampleBlockVersionData
+        exampleGenesisProtocolConstants1
+        exampleGenesisInitializer
+
+exampleGenesisConfiguration_GCSpec2 :: GenesisConfiguration
+exampleGenesisConfiguration_GCSpec2 =
+    GCSpec $ UnsafeGenesisSpec
+        exampleGenesisAvvmBalances2
+        exampleSharedSeed2
+        exampleGenesisDelegation
+        exampleBlockVersionData
+        exampleGenesisProtocolConstants2
+        exampleGenesisInitializer
+
+exampleGenesisData :: GenesisData
+exampleGenesisData =
+    GenesisData
+        { gdBootStakeholders = exampleGenesisWStakeholders
+        , gdHeavyDelegation = exampleGenesisDelegation
+        , gdStartTime = Timestamp { getTimestamp = 1337 }
+        , gdVssCerts = exampleGenesisVssCertificatesMap
+        , gdNonAvvmBalances = exampleGenesisNonAvvmBalances
+        , gdBlockVersionData = exampleBlockVersionData
+        , gdProtocolConsts = exampleGenesisProtocolConstants0
+        , gdAvvmDistr = exampleGenesisAvvmBalances0
+        , gdFtsSeed = exampleSharedSeed0
+        }
+
+exampleGenesisWStakeholders :: GenesisWStakeholders
+exampleGenesisWStakeholders =
+    let mapSize = 1
+        stakeholderIds = replicate mapSize exampleStakeholderId
+        word16s :: [Word16]
+        word16s = [1337]
+    in  GenesisWStakeholders { getGenesisWStakeholders =
+            M.fromList $ zip stakeholderIds word16s }
+
+exampleGenesisVssCertificatesMap :: GenesisVssCertificatesMap
+exampleGenesisVssCertificatesMap =
+    GenesisVssCertificatesMap { getGenesisVssCertificatesMap =
+        exampleVssCertificatesMap 10 4 }
+
+exampleGenesisNonAvvmBalances :: GenesisNonAvvmBalances
+exampleGenesisNonAvvmBalances =
+    GenesisNonAvvmBalances {getGenesisNonAvvmBalances =
+        (HM.fromList [ (exampleAddress, coin)
+                     , (exampleAddress1, coin1)
+                     ]) }
+  where
+    coin  = Coin {getCoin = 36524597913081152}
+    coin1 = Coin {getCoin = 37343863242999412}
+
+exampleGenesisAvvmBalances0 :: GenesisAvvmBalances
+exampleGenesisAvvmBalances0 =
     GenesisAvvmBalances {getGenesisAvvmBalances =
         (HM.fromList [(RedeemPublicKey (Ed25519.PublicKey fstRedKey)
                      , Coin {getCoin = 36524597913081152})
@@ -642,8 +715,42 @@ exampleGenesisAvvmBalances =
     sndRedKey = hexToBS "9cdabcec332abbc6fdf883ca5bf3a8afddca69bfea\
                         \c14c013304da88ac032fe6"
 
-exampleSharedSeed :: SharedSeed
-exampleSharedSeed = SharedSeed (getBytes 8 32)
+exampleGenesisAvvmBalances1 :: GenesisAvvmBalances
+exampleGenesisAvvmBalances1 =
+    GenesisAvvmBalances {getGenesisAvvmBalances =
+        (HM.fromList [(RedeemPublicKey (Ed25519.PublicKey fstRedKey)
+                     , Coin {getCoin = 434210906})
+                     ,(RedeemPublicKey (Ed25519.PublicKey  sndRedKey)
+                     ,Coin {getCoin = 172323403})
+                     ]) }
+  where
+    fstRedKey = hexToBS "a75fe437a908c252a8f3e9601df15d593a1a2a589c\
+                        \65b9519b0fab24f9396bdf"
+    sndRedKey = hexToBS "296ca6970e61bf9854aea38d2cae9b3019a5c63fd28\
+                        \ff4a0e9d366c825c788e4"
+
+exampleGenesisAvvmBalances2 :: GenesisAvvmBalances
+exampleGenesisAvvmBalances2 =
+    GenesisAvvmBalances {getGenesisAvvmBalances =
+        (HM.fromList [(RedeemPublicKey (Ed25519.PublicKey fstRedKey)
+                     , Coin {getCoin = 630099400})
+                     ,(RedeemPublicKey (Ed25519.PublicKey  sndRedKey)
+                     ,Coin {getCoin = 37343863242999412})
+                     ]) }
+  where
+    fstRedKey = hexToBS "81a329ab75009b925efc26c334919509650b865dd6\
+                        \3d6f8db257e0245f04d324"
+    sndRedKey = hexToBS "72043ce554335af1193adeb04639c1e1e2f7aaf203\
+                        \d997f8032856677c2ce05f"
+
+exampleSharedSeed0 :: SharedSeed
+exampleSharedSeed0 = SharedSeed (getBytes 8 32)
+
+exampleSharedSeed1 :: SharedSeed
+exampleSharedSeed1 = SharedSeed (getBytes 16 32)
+
+exampleSharedSeed2 :: SharedSeed
+exampleSharedSeed2 = SharedSeed (getBytes 24 32)
 
 exampleGenesisDelegation :: GenesisDelegation
 exampleGenesisDelegation = UnsafeGenesisDelegation (HM.fromList
@@ -675,12 +782,26 @@ exampleGenesisDelegation = UnsafeGenesisDelegation (HM.fromList
     pskDelChainCode = CC.ChainCode (hexToBS "55163b178e999b9fd50637b2edab8c85\
                                             \8a879ac3c4bd3e610095419a19696573")
 
-exampleGenesisProtocolConstants :: GenesisProtocolConstants
-exampleGenesisProtocolConstants = GenesisProtocolConstants
+exampleGenesisProtocolConstants0 :: GenesisProtocolConstants
+exampleGenesisProtocolConstants0 = GenesisProtocolConstants
     { gpcK = 37
     , gpcProtocolMagic = ProtocolMagic {getProtocolMagic = 1783847074}
     , gpcVssMaxTTL = VssMaxTTL {getVssMaxTTL = 1477558317}
     , gpcVssMinTTL = VssMinTTL {getVssMinTTL = 744040476}}
+
+exampleGenesisProtocolConstants1 :: GenesisProtocolConstants
+exampleGenesisProtocolConstants1 = GenesisProtocolConstants
+    { gpcK = 64
+    , gpcProtocolMagic = ProtocolMagic {getProtocolMagic = 135977977}
+    , gpcVssMaxTTL = VssMaxTTL {getVssMaxTTL = 126106167}
+    , gpcVssMinTTL = VssMinTTL {getVssMinTTL = 310228653}}
+
+exampleGenesisProtocolConstants2 :: GenesisProtocolConstants
+exampleGenesisProtocolConstants2 = GenesisProtocolConstants
+    { gpcK = 2
+    , gpcProtocolMagic = ProtocolMagic {getProtocolMagic = 1780893186}
+    , gpcVssMaxTTL = VssMaxTTL {getVssMaxTTL = 402296078}
+    , gpcVssMinTTL = VssMinTTL {getVssMinTTL = 1341799941}}
 
 exampleGenesisInitializer :: GenesisInitializer
 exampleGenesisInitializer = GenesisInitializer
