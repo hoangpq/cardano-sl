@@ -196,7 +196,6 @@ library
                      , retry
                      , safecopy
                      , safe-exceptions
-                     , scientific
                      , serokell-util
                      , servant
                      , servant-client
