@@ -22,6 +22,7 @@ import           Pos.Core.Chrono
 import           Test.Infrastructure.Generator
 import           Test.Infrastructure.Genesis
 import           Test.Pos.Configuration (withDefConfiguration)
+import           Test.Spec.TxMetaScenarios
 import           Test.Spec.BlockMetaScenarios
 import           Util.Buildable.Hspec
 import           Util.Buildable.QuickCheck
@@ -51,7 +52,13 @@ withWithoutWW specWith = do
     describe "with walletworker"    $ specWith UseWalletWorker
 
 spec :: Spec
-spec =
+spec = do
+    describe "test TxMeta insertion" $ do
+      withWithoutWW $ \useWW -> do
+        it "TxMetaScenarioA" $ bracketActiveWallet $ checkTxMeta' useWW (txMetaScenarioA genesis)
+        it "TxMetaScenarioB" $ bracketActiveWallet $ checkTxMeta' useWW (txMetaScenarioB genesis)
+        it "TxMetaScenarioC" $ bracketActiveWallet $ checkTxMeta' useWW (txMetaScenarioB genesis)
+
     describe "Compare wallet kernel to pure model" $ do
       describe "Using hand-written inductive wallets, computes the expected block metadata for" $ do
         withWithoutWW $ \useWW -> do
@@ -78,6 +85,7 @@ spec =
               , bracketActiveWallet $ \activeWallet -> do
                   checkEquivalent useWW activeWallet ind
               ]
+
   where
     transCtxt = runTranslateNoErrors ask
     boot      = bootstrapTransaction transCtxt
@@ -166,6 +174,18 @@ spec =
             let actual' = actualBlockMeta snapshot
 
             shouldBe actual' expected'
+
+    checkTxMeta' :: Hash h Addr
+                 => UseWalletWorker
+                 -> (Inductive h Addr, Kernel.PassiveWallet -> IO ())
+                 -> Kernel.ActiveWallet
+                 -> IO ()
+    checkTxMeta' useWW (ind, checker) activeWallet
+        = do
+            -- the evaluation changes the wallet state;
+            _ <- evaluate' useWW activeWallet ind
+            checker (Kernel.walletPassive $ activeWallet)
+
 
 {-------------------------------------------------------------------------------
   Manually written inductives
